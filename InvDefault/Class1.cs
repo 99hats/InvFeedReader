@@ -16,6 +16,9 @@ namespace InvDefault
             Label.Font.Size = 20;
             Label.Text = $"Howdy";
 
+            var graphic = Surface.NewGraphic();
+            //graphic.Image = Inv.Default.Resources.Images.Logo;
+
             Application.Window.Transition(Surface);
         }
     }
