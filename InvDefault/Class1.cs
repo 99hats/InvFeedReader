@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Threading.Tasks;
 using Inv;
 
 namespace InvDefault
@@ -23,7 +25,6 @@ namespace InvDefault
 
 
 
-
             var headerLabel = Surface.NewLabel();
             headerLabel.Text = "Section 1";
             section.SetHeader(headerLabel);
@@ -40,8 +41,11 @@ namespace InvDefault
                 if (section.ItemCount % 60 == 0)
                     section.SetItemCount(section.ItemCount + 60);
 
-                var graphic = Surface.NewGraphic();
-                graphic.Image = Inv.Default.Resources.Images.Logo;
+                //var graphic = Surface.NewGraphic();
+                //graphic.Image = Inv.Default.Resources.Images.Logo;
+                var uri = $"https://dummyimage.com/300x{200 + i}/000/fff";
+                var graphic = new WebGraphic(Application, Surface, uri);
+
                 var max = 200;
                 var size = Math.Max(i, 5);
                 size = Math.Min(size, 50);
@@ -189,6 +193,51 @@ namespace InvDefault
 
 
             Application.Window.Transition(Surface);
+        }
+    }
+
+    
+
+    public class WebGraphic : Inv.Mimic<Graphic>
+    {
+        private readonly Application _application;
+        private readonly string _uri;
+
+        public WebGraphic(Application application, Surface surface, string uri)
+        {
+            this.Base = surface.NewGraphic();
+            this.Size = this.Base.Size;
+
+            _application = application;
+            _uri = uri;
+
+            
+            Init();
+        }
+
+        public Size Size { get; set; }
+
+        private async void Init()
+        {
+            this.Base.Image = null; // put loading image here
+            this.Base.Image = await GetImage(_uri);
+        }
+
+        public async Task<Inv.Image> GetImage(string uri)
+        {
+
+
+            using (var download = _application.Web.GetDownload(new Uri(uri)))
+            using (var memoryStream = new MemoryStream((int)download.Length))
+            {
+                download.Stream.CopyTo(memoryStream);
+
+                memoryStream.Flush();
+
+                var image = new Inv.Image(memoryStream.ToArray(), ".png");
+
+                return image;
+            }
         }
     }
 }
