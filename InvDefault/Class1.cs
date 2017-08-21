@@ -9,11 +9,16 @@ namespace InvDefault
 {
     public static class Shell
     {
-        public static void Install(Inv.Application Application)
-        {
-            Application.Title = "My Project";
+        private static Application _application;
 
-            var Surface = Application.Window.NewSurface();
+        public static void Install(Inv.Application application)
+        {
+
+            _application = application;
+
+            application.Title = "My Project";
+
+            var Surface = application.Window.NewSurface();
             Surface.Background.Colour = Colour.WhiteSmoke;
 
             var cache = new Dictionary<int, Panel>();
@@ -27,12 +32,12 @@ namespace InvDefault
             section.SetHeader(headerLabel);
 
             // https://mcweekly-app.firebaseio.com/v6/basic.json?orderBy=%22starttime%22&limitToLast=10&endAt=%22ZZZ%22&startAt=%22%22
-            var broker = Application.Web.NewBroker("https://mcweekly-app.firebaseio.com/v6/");
+            var broker = application.Web.NewBroker("https://mcweekly-app.firebaseio.com/v6/");
 
             var json = broker.GetTextJsonObject<Dictionary<string, dynamic>>(
-                "basic.json?orderBy=%22starttime%22&limitToLast=10&endAt=%22ZZZ%22&startAt=%22%22");
+                "basic.json?orderBy=%22starttime%22&limitToLast=20&endAt=%22ZZZ%22&startAt=%22%22");
 
-            Debug.WriteLine($"Width: {Application.Window.Width}");
+            Debug.WriteLine($"Width: {application.Window.Width}");
             var items = json.Values.ToList();
 
             section.ItemQuery += i =>
@@ -42,7 +47,7 @@ namespace InvDefault
                 string uri = items[i].preview_url;
                 Debug.WriteLine(uri);
 
-                var graphic = new WebGraphic(Application, Surface, uri);
+                var graphic = new WebGraphic(_application, Surface, uri);
 
                 var max = 200;
                 var size = Math.Max(i, 5);
@@ -74,10 +79,6 @@ namespace InvDefault
                 panel.AdjustEvent += () => Debug.WriteLine($"Panel: {panel.Surface.Window.Width}");
 
 
-                for (int j = 0; j < i; j++)
-                {
-                    lbl.Text += " bar";
-                }
 
                 panel.Background.Colour = Colour.Beige;
 
@@ -93,44 +94,70 @@ namespace InvDefault
 
             Surface.Content = dock;
 
-            Application.Window.Transition(Surface);
+            application.Window.Transition(Surface);
         }
     }
-
     public class WebGraphic : Inv.Mimic<Graphic>
     {
-        private readonly Application _application;
-        private readonly string _uri;
-
-        public WebGraphic(Application application, Surface surface, string uri)
+        public WebGraphic(Application _application, Surface surface, string uri)
         {
             this.Base = surface.NewGraphic();
-            this.Size = this.Base.Size;
-
-            _application = application;
-            _uri = uri;
 
             this.Base.Image = Inv.Default.Resources.Images.Logo; ; // put loading image here
 
-            _application.Window.RunTask(GetImage(_uri));
-        }
-
-        public Size Size { get; set; }
-
-        public Action<WindowThread> GetImage(string uri)
-        {
-            using (var download = _application.Web.GetDownload(new Uri(uri)))
-            using (var memoryStream = new MemoryStream((int)download.Length))
+            surface.Window.RunTask(Thread =>
             {
-                download.Stream.CopyTo(memoryStream);
+                using (var download = _application.Web.GetDownload(new Uri(uri)))
+                using (var memoryStream = new MemoryStream((int)download.Length))
+                {
+                    download.Stream.CopyTo(memoryStream);
 
-                memoryStream.Flush();
+                    memoryStream.Flush();
 
-                var image = new Inv.Image(memoryStream.ToArray(), ".png");
+                    var image = new Inv.Image(memoryStream.ToArray(), ".png");
 
-                this.Base.Image = image;
-            }
-            return null;
+                    Thread.Post(() => this.Base.Image = image);
+                }
+            });
         }
+
+        public Size Size => Base.Size;
     }
+
+    //public class WebGraphic : Inv.Mimic<Graphic>
+    //{
+    //    private readonly Application _application;
+    //    private readonly string _uri;
+
+    //    public WebGraphic(Application application, Surface surface, string uri)
+    //    {
+    //        this.Base = surface.NewGraphic();
+    //        this.Size = this.Base.Size;
+
+    //        _application = application;
+    //        _uri = uri;
+
+    //        this.Base.Image = Inv.Default.Resources.Images.Logo; ; // put loading image here
+
+    //        _application.Window.RunTask(GetImage(_uri));
+    //    }
+
+    //    public Size Size { get; set; }
+
+    //    public Action<WindowThread> GetImage(string uri)
+    //    {
+    //        using (var download = _application.Web.GetDownload(new Uri(uri)))
+    //        using (var memoryStream = new MemoryStream((int)download.Length))
+    //        {
+    //            download.Stream.CopyTo(memoryStream);
+
+    //            memoryStream.Flush();
+
+    //            var image = new Inv.Image(memoryStream.ToArray(), ".png");
+
+    //            this.Base.Image = image;
+    //        }
+    //        return null;
+    //    }
+    //}
 }
