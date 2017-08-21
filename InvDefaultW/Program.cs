@@ -17,7 +17,7 @@ namespace InvDefaultW
             {
 #if DEBUG
                 Inv.WpfShell.PreventDeviceEmulation = false;
-                Inv.WpfShell.DeviceEmulation = Inv.WpfDeviceEmulation.iPad_Mini;
+                Inv.WpfShell.DeviceEmulation = Inv.WpfDeviceEmulation.iPhone6_7;
 #endif
                 Inv.WpfShell.FullScreenMode = false;
                 Inv.WpfShell.DefaultWindowWidth = 1920;

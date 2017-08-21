@@ -21,10 +21,17 @@ namespace InvDefault
             var surface = application.Window.NewSurface();
             surface.Background.Colour = Colour.WhiteSmoke;
 
+            var flow = surface.NewFlow();
+            //var overlay = surface.NewOverlay();
+            //overlay.AddPanel(flow);
+            surface.Content = flow;
+            application.Window.Transition(surface).Fade();
+
+
             var cache = new Dictionary<int, Panel>();
             cache.Clear();
 
-            var flow = surface.NewFlow();
+            
             //flow.Margin.Set(24);
             var section = flow.AddSection();
 
@@ -32,20 +39,27 @@ namespace InvDefault
             headerLabel.Text = "Section 1";
             section.SetHeader(headerLabel);
 
-            IList<dynamic> items = new List<dynamic>();
+            IList<DtoBasic> items = new List<DtoBasic>();
 
             surface.Window.RunTask(Thread =>
             {
                 // https://mcweekly-app.firebaseio.com/v6/basic.json?orderBy=%22starttime%22&limitToLast=10&endAt=%22ZZZ%22&startAt=%22%22
                 var broker = application.Web.NewBroker("https://mcweekly-app.firebaseio.com/v6/");
 
-                var json = broker.GetTextJsonObject<Dictionary<string, dynamic>>(
+                var json = broker.GetTextJsonObject<Dictionary<string, DtoBasic>>(
                     "basic.json?orderBy=%22starttime%22&limitToLast=60&endAt=%22ZZZ%22&startAt=%22%22");
                 items = json.Values.ToList();
-                items.Reverse();
 
-                Thread.Post(()=> section.SetItemCount(items.Count));
+                Thread.Post(() => section.SetItemCount(items.Count));
             });
+
+
+            //var broker = application.Web.NewBroker("https://mcweekly-app.firebaseio.com/v6/");
+
+            //var json = broker.GetTextJsonObject<Dictionary<string, DtoBasic>>(
+            //    "basic.json?orderBy=%22starttime%22&limitToLast=60&endAt=%22ZZZ%22&startAt=%22%22");
+            //items = json.Values.ToList();
+            //section.SetItemCount(items.Count);
 
             Debug.WriteLine($"Width: {application.Window.Width}");
             
@@ -54,7 +68,9 @@ namespace InvDefault
             {
                 if (cache.ContainsKey(i)) return cache[i];
 
-                string uri = items[i].preview_url;
+                var item = items[i];
+
+                string uri = item.preview_url ??"";
                 Debug.WriteLine(uri);
 
                 var graphic = new WebGraphic(_application, surface, uri);
@@ -69,7 +85,7 @@ namespace InvDefault
 
                 var lbl = surface.NewLabel();
                 lbl.LineWrapping = true;
-                lbl.Text = items[i].title;
+                lbl.Text = item.title;
                 lbl.Margin.Set(16);
                 lbl.Size.AutoHeight();
                 lbl.Size.AutoMaximumWidth();
@@ -93,26 +109,61 @@ namespace InvDefault
 
                 panel.Border.Set(0,0,0,2);
                 panel.Border.Colour = Colour.DimGray;
+                Surface sf2;
 
                 var button = surface.NewButton();
                 button.Content = panel;
-                button.SingleTapEvent += () => Debug.WriteLine("Button Pressed");
+                button.SingleTapEvent += () =>
+                {
+                    sf2 = application.Window.NewSurface();
+
+                    Debug.WriteLine("Button Pressed");
+                    var btnLbl = sf2.NewLabel();
+                    btnLbl.Text = "close me";
+                    var btn = sf2.NewButton();
+                    btn.Content = btnLbl;
+                    btn.Alignment.CenterStretch();
+                    btn.Background.Colour = Colour.DodgerBlue;
+                    btn.SingleTapEvent += () =>
+                    {
+                        application.Window.Transition(surface).CarouselBack();
+                    };
+                    sf2.Content = btn;
+
+                    application.Window.Transition(sf2).CarouselNext();
+                };
 
                 cache.Add(i, button);
 
                 return button;
             };
 
-            section.SetItemCount(0);
+            //section.SetItemCount(0);
 
             //var dock = surface.NewHorizontalDock();
             //dock.Size.Auto();
             //dock.AddClient(flow);
 
-            surface.Content = flow;
-
-            application.Window.Transition(surface);
+            
+            
+            
         }
+    }
+
+    public class DtoBasic 
+    {
+        public string flags { get; set; }
+        public string keywords { get; set; }
+        public string presentation { get; set; }
+        public string sections { get; set; }
+        public string preview_url { get; set; }
+        public int? preview_height { get; set; }
+        public int? preview_width { get; set; }
+        public string starttime { get; set; }
+        public string lastupdated { get; set; }
+        public string title { get; set; }
+        public string type { get; set; }
+        public string uuid { get; set; }
     }
 
     public class WebGraphic : Inv.Mimic<Graphic>
@@ -139,7 +190,16 @@ namespace InvDefault
 
                         var image = new Inv.Image(memoryStream.ToArray(), ".png");
 
-                        Thread.Post(() => { this.Base.Image = image; });
+                        
+
+
+                        Thread.Post(() =>
+                        {
+                            var FadeInAnimation = surface.NewAnimation();
+                            FadeInAnimation.AddTarget(this.Base).FadeOpacityIn(TimeSpan.FromSeconds(1));
+                            this.Base.Image = image;
+                            FadeInAnimation.Start();
+                        });
                     }
                 });
         }
