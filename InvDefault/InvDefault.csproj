@@ -75,10 +75,13 @@
     <EmbeddedResource Include="Resources\Resources1.InvResourcePackage.rs">
       <DependentUpon>Resources1.InvResourcePackage</DependentUpon>
     </EmbeddedResource>
+    <None Include="Resources\Text\newsapi.key" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Resources\Images\Logo.png" />
+    <Content Include="Resources\Images\placeholder.png" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Invention.Library.1.0.25\build\Invention.Library.targets" Condition="Exists('..\packages\Invention.Library.1.0.25\build\Invention.Library.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

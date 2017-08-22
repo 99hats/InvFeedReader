@@ -8,6 +8,7 @@ namespace Inv.Default
     }
 
     public static readonly ResourcesImages Images;
+    public static readonly ResourcesText Text;
   }
 
   public sealed class ResourcesImages
@@ -16,5 +17,15 @@ namespace Inv.Default
 
     ///<Summary>41.5 KB</Summary>
     public readonly global::Inv.Image Logo;
+    ///<Summary>18.6 KB</Summary>
+    public readonly global::Inv.Image Placeholder;
+  }
+
+  public sealed class ResourcesText
+  {
+    public ResourcesText() { }
+
+    ///<Summary>0.0 KB</Summary>
+    public readonly global::Inv.Binary Newsapi;
   }
 }
