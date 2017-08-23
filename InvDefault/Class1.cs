@@ -1,4 +1,5 @@
 ﻿using Inv;
+using Priority_Queue;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -32,6 +33,37 @@ namespace InvDefault
 
             // grap api key
             string apiKey = System.Text.Encoding.UTF8.GetString(Inv.Default.Resources.Text.Newsapi.GetBuffer());
+
+
+
+            //////////////////////////// TEST QUEUE
+
+
+            SimplePriorityQueue<string> priorityQueue = new SimplePriorityQueue<string>();
+
+            //Now, let's add them all to the queue (in some arbitrary order)!
+            priorityQueue.Enqueue("4 - Joseph", 4);
+            priorityQueue.Enqueue("2 - Tyler", 0); //Note: Priority = 0 right now!
+            priorityQueue.Enqueue("1 - Jason", 1);
+            priorityQueue.Enqueue("4 - Ryan", 4);
+            priorityQueue.Enqueue("3 - Valerie", 3);
+
+            //Change one of the string's priority to 2.  Since this string is already in the priority queue, we call UpdatePriority() to do this
+            priorityQueue.UpdatePriority("2 - Tyler", 2);
+
+            //Finally, we'll dequeue all the strings and print them out
+            while (priorityQueue.Count != 0)
+            {
+                string nextUser = priorityQueue.Dequeue();
+                Debug.WriteLine(nextUser);
+            }
+
+
+            /////////////////////////////// END TEST QUEUE
+
+
+
+
 
             // main listview
             var flow = mainSurface.NewFlow();
