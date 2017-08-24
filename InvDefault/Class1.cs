@@ -3,6 +3,7 @@ using Priority_Queue;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -40,6 +41,7 @@ namespace InvDefault
 
 
             SimplePriorityQueue<string> priorityQueue = new SimplePriorityQueue<string>();
+            SimplePriorityQueue<Action> actionQueue = new SimplePriorityQueue<Action>();
 
             //Now, let's add them all to the queue (in some arbitrary order)!
             priorityQueue.Enqueue("4 - Joseph", 4);
@@ -76,11 +78,20 @@ namespace InvDefault
             headerLabel.Text = "Tech Crunch";
             headerLabel.JustifyCenter();
             headerLabel.Alignment.TopStretch();
-            headerLabel.Padding.Set(0, (mainSurface.Window.Height / 3), 0, 4);
+            Debug.WriteLine($"mainSurface.Window.Height: {_application.Window.Height}");
+            headerLabel.Padding.Set(0, (_application.Window.Height / 3), 0, 4);
             headerLabel.Background.Colour = Colour.DodgerBlue;
             headerLabel.Font.Colour = Colour.White;
             headerLabel.Font.Size = 32;
             headerLabel.Font.Heavy();
+            headerLabel.AdjustEvent += () =>
+            {
+                Debug.WriteLine($"mainSurface: {mainSurface.Window.Height}");
+                if (mainSurface.Window.Height > 0)
+                {
+                    headerLabel.Padding.Set(0, (mainSurface.Window.Height / 3), 0, 4);
+                }
+            };
             section.SetHeader(headerLabel);
 
             IList<Article> items = new List<Article>();
@@ -89,15 +100,39 @@ namespace InvDefault
             //var bgQueue = new BackgroundQueue();
             //bgQueue.QueueTask(() => LongRunningTask());
 
+
+            #region actionqueue
+            //this works!
             // fetch feed
-            mainSurface.Window.RunTask(thread =>
+            void loadFeed(WindowThread thread)
             {
+                Debug.WriteLine(">>>>>>>>>>>>>>>>>>>>>>>> LOAD FEED");
                 var broker = application.Web.NewBroker("https://newsapi.org/v1/");
-                var json = broker.GetTextJsonObject<FeedObject>(@"articles?source=techcrunch&sortBy=latest&apiKey=" +
-                                                                apiKey);
+                var json = broker.GetTextJsonObject<FeedObject>(@"articles?source=techcrunch&sortBy=latest&apiKey=" + apiKey);
                 items = json.articles.ToList();
                 thread.Post(() => section.SetItemCount(items.Count));
+            }
+
+            //mainSurface.Window.RunTask((Thread) => loadFeed(Thread));
+
+
+            ActionQueue queue = new ActionQueue();
+
+            mainSurface.Window.RunTask((Thread) =>
+            {
+                queue.Enqueue(() =>
+                    loadFeed(Thread));
+
+                queue.Process();
+
             });
+
+            
+
+            #endregion
+
+
+
 
             var cache = new Dictionary<int, Panel>();
             var htmlCache = new Dictionary<string, string>();
@@ -157,7 +192,6 @@ namespace InvDefault
                 }
 
                 cellPanel.SingleTapEvent += OnCellPanelOnSingleTapEvent;
-
                 return cellPanel;
 
             };
@@ -195,67 +229,67 @@ namespace InvDefault
 
     #region models
     // modeled using json2csharp.net
-        public class Article
+    public class Article
+    {
+        public string author { get; set; }
+        public string title { get; set; }
+        public string description { get; set; }
+        public string url { get; set; }
+        public string urlToImage { get; set; }
+        public string publishedAt { get; set; }
+    }
+
+    public class FeedObject
+    {
+        public string status { get; set; }
+        public string source { get; set; }
+        public string sortBy { get; set; }
+        public List<Article> articles { get; set; }
+    }
+    #endregion
+
+    #region helpers
+    public class FeedItemPanel : Inv.Mimic<Button>
+    {
+        private Application _application;
+        private Surface _surface;
+        private Article _article;
+
+        public FeedItemPanel(Application application, Surface surface, Article article)
         {
-            public string author { get; set; }
-            public string title { get; set; }
-            public string description { get; set; }
-            public string url { get; set; }
-            public string urlToImage { get; set; }
-            public string publishedAt { get; set; }
+            _application = application;
+            _surface = surface;
+            _article = article;
+
+            this.Base = surface.NewButton();
+
+            BuildPanel();
         }
 
-        public class FeedObject
+        private void BuildPanel()
         {
-            public string status { get; set; }
-            public string source { get; set; }
-            public string sortBy { get; set; }
-            public List<Article> articles { get; set; }
+            var graphic = new WebGraphic(_application, _surface, _article.urlToImage);
+            graphic.Size.SetWidth(_surface.Window.Width);
+
+            var lbl = _surface.NewLabel();
+            lbl.LineWrapping = true;
+            lbl.Text = _article.title;
+            lbl.Margin.Set(16);
+            lbl.Size.AutoHeight();
+            lbl.Size.AutoMaximumWidth();
+            lbl.Font.Size = 18;
+
+            var panel = _surface.NewTable();
+            var gRow = panel.AddRow();
+            gRow.Star();
+            var tRow = panel.AddRow();
+            tRow.Auto();
+            var tCol = panel.AddColumn();
+            tCol.Star();
+            panel.GetCell(0, 0).Content = graphic;
+            panel.GetCell(0, 1).Content = lbl;
+            this.Base.Content = panel;
         }
-        #endregion
-
-        #region helpers
-        public class FeedItemPanel : Inv.Mimic<Button>
-        {
-            private Application _application;
-            private Surface _surface;
-            private Article _article;
-
-            public FeedItemPanel(Application application, Surface surface, Article article)
-            {
-                _application = application;
-                _surface = surface;
-                _article = article;
-
-                this.Base = surface.NewButton();
-
-                BuildPanel();
-            }
-
-            private void BuildPanel()
-            {
-                var graphic = new WebGraphic(_application, _surface, _article.urlToImage);
-                graphic.Size.SetWidth(_surface.Window.Width);
-
-                var lbl = _surface.NewLabel();
-                lbl.LineWrapping = true;
-                lbl.Text = _article.title;
-                lbl.Margin.Set(16);
-                lbl.Size.AutoHeight();
-                lbl.Size.AutoMaximumWidth();
-                lbl.Font.Size = 18;
-
-                var panel = _surface.NewTable();
-                var gRow = panel.AddRow();
-                gRow.Star();
-                var tRow = panel.AddRow();
-                tRow.Auto();
-                var tCol = panel.AddColumn();
-                tCol.Star();
-                panel.GetCell(0, 0).Content = graphic;
-                panel.GetCell(0, 1).Content = lbl;
-                this.Base.Content = panel;
-            }
 
         public event Action SingleTapEvent
         {
@@ -264,19 +298,19 @@ namespace InvDefault
         }
     }
 
-        public class WebGraphic : Inv.Mimic<Graphic>
+    public class WebGraphic : Inv.Mimic<Graphic>
+    {
+        public WebGraphic(Application _application, Surface surface, string uri)
         {
-            public WebGraphic(Application _application, Surface surface, string uri)
-            {
-                this.Base = surface.NewGraphic();
-                this.Base.Image = Inv.Default.Resources.Images.Placeholder; // put loading image here
+            this.Base = surface.NewGraphic();
+            this.Base.Image = Inv.Default.Resources.Images.Placeholder; // put loading image here
 
-            var cacheFileName = Shell.GetMD5Hash(uri) +".jpg";
+            var cacheFileName = Shell.GetMD5Hash(uri) + ".jpg";
             var files = _application.Directory.RootFolder.GetFiles("*.jpg");
 
             Debug.WriteLine($"cacheFileName: {cacheFileName}");
             var cache = files.FirstOrDefault(x => x.Name == cacheFileName);
-            if (cache !=null) 
+            if (cache != null)
             {
                 //var cache = _application.Directory.RootFolder.NewFile(cacheFileName);
                 var thebytes = cache.ReadAllBytes();
@@ -287,34 +321,34 @@ namespace InvDefault
             }
 
             if (!String.IsNullOrEmpty(uri))
-                    surface.Window.RunTask(Thread =>
+                surface.Window.RunTask(Thread =>
+                {
+                    using (var download = _application.Web.GetDownload(new Uri(uri)))
+
+                    using (var memoryStream = new MemoryStream((int)download.Length))
                     {
-                        using (var download = _application.Web.GetDownload(new Uri(uri)))
+                        var cacheFile = _application.Directory.RootFolder.NewFile(cacheFileName);
 
-                        using (var memoryStream = new MemoryStream((int)download.Length))
+                        download.Stream.CopyTo(memoryStream);
+                        memoryStream.Flush();
+
+                        cacheFile.WriteAllBytes(memoryStream.ToArray());
+
+                        var image = new Inv.Image(memoryStream.ToArray(), ".jpg");
+                        Thread.Post(() =>
                         {
-                            var cacheFile = _application.Directory.RootFolder.NewFile(cacheFileName);
-
-                            download.Stream.CopyTo(memoryStream);
-                            memoryStream.Flush();
-
-                            cacheFile.WriteAllBytes(memoryStream.ToArray());
-
-                            var image = new Inv.Image(memoryStream.ToArray(), ".jpg");
-                            Thread.Post(() =>
-                            {
-                                var FadeInAnimation = surface.NewAnimation();
-                                FadeInAnimation.AddTarget(this.Base).FadeOpacityIn(TimeSpan.FromSeconds(1));
-                                this.Base.Image = image;
-                                FadeInAnimation.Start();
-                            });
-                        }
-                    });
-            }
-
-            public Size Size => Base.Size;
-            public Alignment Alignment => Base.Alignment;
+                            var FadeInAnimation = surface.NewAnimation();
+                            FadeInAnimation.AddTarget(this.Base).FadeOpacityIn(TimeSpan.FromSeconds(1));
+                            this.Base.Image = image;
+                            FadeInAnimation.Start();
+                        });
+                    }
+                });
         }
+
+        public Size Size => Base.Size;
+        public Alignment Alignment => Base.Alignment;
+    }
 
     public class BackgroundQueue
     {
@@ -346,6 +380,162 @@ namespace InvDefault
         }
     }
 
+
+
+    // https://codereview.stackexchange.com/questions/6826/action-queue-in-net-3-5
+    public class ActionQueue
+    {
+        private Thread _thread;
+        private bool _isProcessed = false;
+        private object _queueSync = new object();
+        private readonly Queue<Action> _actions = new Queue<Action>();
+        private SynchronizationContext _context;
+
+        /// <summary>
+        /// Occurs when one of executed action throws unhandled exception.
+        /// </summary>
+        public event CrossThreadExceptionEventHandler ExceptionOccured;
+
+        /// <summary>
+        /// Occurs when all actions in queue are finished.
+        /// </summary>
+        public event EventHandler ProcessingFinished;
+
+        /// <summary>
+        /// Gets enqueued actions.
+        /// </summary>
+        public IEnumerable<Action> Actions
+        {
+            get
+            {
+                lock (_queueSync)
+                {
+                    return new ReadOnlyCollection<Action>(_actions.ToList());
+                }
+            }
+        }
+
+        protected virtual void Execute()
+        {
+            _isProcessed = true;
+
+            try
+            {
+                while (true)
+                {
+                    Action action = null;
+
+                    lock (_queueSync)
+                    {
+                        if (_actions.Count == 0)
+                            break;
+                        else
+                            action = _actions.Dequeue();
+                    }
+
+                    action.Invoke();
+                }
+
+                if (ProcessingFinished != null)
+                {
+                    _context.Send(s => ProcessingFinished(this, EventArgs.Empty), null);
+                }
+            }
+            catch (ThreadAbortException)
+            {
+                // Execution aborted
+            }
+            catch (Exception ex)
+            {
+                if (ExceptionOccured != null)
+                {
+                    _context.Send(s => ExceptionOccured(this, new CrossThreadExceptionEventArgs(ex)), null);
+                }
+            }
+            finally
+            {
+                _isProcessed = false;
+            }
+        }
+
+        /// <summary>
+        /// Starts processing current queue.
+        /// </summary>
+        /// <returns>Returns true if execution was started.</returns>
+        public virtual bool Process()
+        {
+            if (!_isProcessed)
+            {
+                _context = SynchronizationContext.Current;
+
+                _thread = new Thread(Execute);
+                _thread.Start();
+
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Enqueues action to process.
+        /// </summary>
+        /// <param name="action">Action to enqueue.</param>
+        public void Enqueue(Action action)
+        {
+            lock (_queueSync)
+            {
+                Debug.WriteLine("Enqueue");
+                _actions.Enqueue(action);
+            }
+        }
+
+        /// <summary>
+        /// Clears queue.
+        /// </summary>
+        public void Clear()
+        {
+            lock (_queueSync)
+            {
+                _actions.Clear();
+            }
+        }
+
+        /// <summary>
+        /// Aborts execution of current queue.
+        /// </summary>
+        /// <returns>Returns true if execution was aborted.</returns>
+        public bool Abort()
+        {
+            if (_isProcessed)
+            {
+                _thread.Abort();
+                return true;
+            }
+            else
+            {
+                return false;
+            }
+        }
+    }
+
+    public delegate void CrossThreadExceptionEventHandler(object sender, CrossThreadExceptionEventArgs e);
+
+    public class CrossThreadExceptionEventArgs : EventArgs
+    {
+        public CrossThreadExceptionEventArgs(Exception exception)
+        {
+            this.Exception = exception;
+        }
+
+        public Exception Exception
+        {
+            get;
+            set;
+        }
+    }
 
 
     #endregion helpers
