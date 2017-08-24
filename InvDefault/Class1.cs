@@ -1,5 +1,5 @@
 ﻿using Inv;
-using Priority_Queue;
+//using Priority_Queue;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -35,36 +35,7 @@ namespace InvDefault
             // grap api key
             string apiKey = System.Text.Encoding.UTF8.GetString(Inv.Default.Resources.Text.Newsapi.GetBuffer());
 
-
-
-            //////////////////////////// TEST QUEUE
-
-
-            SimplePriorityQueue<string> priorityQueue = new SimplePriorityQueue<string>();
-            SimplePriorityQueue<Action> actionQueue = new SimplePriorityQueue<Action>();
-
-            //Now, let's add them all to the queue (in some arbitrary order)!
-            priorityQueue.Enqueue("4 - Joseph", 4);
-            priorityQueue.Enqueue("2 - Tyler", 0); //Note: Priority = 0 right now!
-            priorityQueue.Enqueue("1 - Jason", 1);
-            priorityQueue.Enqueue("4 - Ryan", 4);
-            priorityQueue.Enqueue("3 - Valerie", 3);
-
-            //Change one of the string's priority to 2.  Since this string is already in the priority queue, we call UpdatePriority() to do this
-            priorityQueue.UpdatePriority("2 - Tyler", 2);
-
-            //Finally, we'll dequeue all the strings and print them out
-            while (priorityQueue.Count != 0)
-            {
-                string nextUser = priorityQueue.Dequeue();
-                Debug.WriteLine(nextUser);
-            }
-
-
-            /////////////////////////////// END TEST QUEUE
-
-
-
+           var priorityQueue = new InvDefault.SimplePriorityQueue<string,int>();
 
 
             // main listview
@@ -72,13 +43,17 @@ namespace InvDefault
             mainSurface.Content = flow;
             _application.Window.Transition(mainSurface).Fade();
 
-            // section
-            var section = flow.AddSection();
+
+            // caching
+            var cache = new Dictionary<int, Panel>();
+            var htmlCache = new Dictionary<string, string>();
+            htmlCache.Clear();
+            
+
             var headerLabel = mainSurface.NewLabel();
             headerLabel.Text = "Tech Crunch";
             headerLabel.JustifyCenter();
             headerLabel.Alignment.TopStretch();
-            Debug.WriteLine($"mainSurface.Window.Height: {_application.Window.Height}");
             headerLabel.Padding.Set(0, (_application.Window.Height / 3), 0, 4);
             headerLabel.Background.Colour = Colour.DodgerBlue;
             headerLabel.Font.Colour = Colour.White;
@@ -86,57 +61,126 @@ namespace InvDefault
             headerLabel.Font.Heavy();
             headerLabel.AdjustEvent += () =>
             {
-                Debug.WriteLine($"mainSurface: {mainSurface.Window.Height}");
+
+                // Because iOS doesn't get the Window.Height
+                // back to the program fast enough, use AdjustEvent
                 if (mainSurface.Window.Height > 0)
                 {
                     headerLabel.Padding.Set(0, (mainSurface.Window.Height / 3), 0, 4);
+                    flow.Refresh();
                 }
             };
+
+            // section
+            var section = flow.AddSection();
             section.SetHeader(headerLabel);
 
+
             IList<Article> items = new List<Article>();
-
-
-            //var bgQueue = new BackgroundQueue();
-            //bgQueue.QueueTask(() => LongRunningTask());
-
-
-            #region actionqueue
-            //this works!
-            // fetch feed
-            void loadFeed(WindowThread thread)
-            {
-                Debug.WriteLine(">>>>>>>>>>>>>>>>>>>>>>>> LOAD FEED");
-                var broker = application.Web.NewBroker("https://newsapi.org/v1/");
-                var json = broker.GetTextJsonObject<FeedObject>(@"articles?source=techcrunch&sortBy=latest&apiKey=" + apiKey);
-                items = json.articles.ToList();
-                thread.Post(() => section.SetItemCount(items.Count));
-            }
-
-            //mainSurface.Window.RunTask((Thread) => loadFeed(Thread));
-
-
             ActionQueue queue = new ActionQueue();
 
-            mainSurface.Window.RunTask((Thread) =>
+            flow.RefreshEvent += (FlowRefresh obj) =>
             {
-                queue.Enqueue(() =>
-                    loadFeed(Thread));
+                Debug.WriteLine($"Refresh listview");
+                mainSurface.Window.RunTask((Thread) =>
+                {
+                    var json =LoadArticles();
+                    Thread.Post(() => {
+                        items = json.articles.ToList();
+                        section.SetItemCount(items.Count);
+                        obj.Complete();
+                        cacheUrls(items);
+                    });
+                });
+            };
 
-                queue.Process();
 
-            });
 
+            FeedObject LoadArticles()
+            {
+                    var broker = application.Web.NewBroker("https://newsapi.org/v1/");
+                    var json = broker.GetTextJsonObject<FeedObject>(@"articles?source=techcrunch&sortBy=latest&apiKey=" + apiKey);
+                return json;
+            }
+
+            if (application.Device.IsWindows)
+            {
+                // I don't do windows
+                // err, windows doesn't do flow.Refresh() 
+                var json = LoadArticles();
+                items = json.articles.ToList();
+                section.SetItemCount(items.Count);
+                cacheUrls(items);
+            }
+            else
+            {
+                flow.Refresh();
+            }
+
+            #region actionqueue
             
 
+
+
+            void cacheUrl(string url)
+            {
+                var key = @"https://mercury.postlight.com/amp?url=" + url;
+                var uri3 = new Uri(key);
+                Debug.WriteLine($"uri3: {key}");
+                var broker = _application.Web.NewBroker($"{uri3.Scheme}://{uri3.DnsSafeHost}");
+                var html = broker.GetPlainText(uri3.PathAndQuery);
+
+                htmlCache[url] = "cache " + html;
+            }
+
+            void cacheUrls(IList<Article> articles)
+            {
+                var browser = mainSurface.NewBrowser();
+                
+                foreach (var item in articles)
+                {
+                    queue.Enqueue(() => cacheUrl(item.url));
+                }
+            }
+
+            // Background task queue
+            mainSurface.Window.RunTask((Thread) =>
+            {
+                while (true)
+                {
+                    if (priorityQueue.Count > 0)
+                    {
+                        string response = priorityQueue.Dequeue();
+                        Debug.WriteLine($"{priorityQueue.Count}: {response}");
+
+                        var split = response.Split(new char[] { ':' }, StringSplitOptions.None);
+                        var cmd = split[0].Trim();
+                        var cmdParam = split[1].Trim();
+                        switch (cmd)
+                        {
+                            case "cache":
+                                break;
+
+                            case "log":
+                                Debug.WriteLine($"Log: {cmdParam}");
+                                break;
+                        }
+
+                    }
+                    else
+                    {
+                        Debug.WriteLine("sleep...");
+                        Thread.Sleep(TimeSpan.FromMilliseconds(5000));
+                    }
+                }
+            });
             #endregion
 
+            mainSurface.LeaveEvent += () =>
+            {
+                Debug.Write("mainSurface.LeaveEvent");
+            };
 
-
-
-            var cache = new Dictionary<int, Panel>();
-            var htmlCache = new Dictionary<string, string>();
-            htmlCache.Clear();
 
             section.ItemQuery += i =>
             {
@@ -150,6 +194,8 @@ namespace InvDefault
 
                 void OnCellPanelOnSingleTapEvent()
                 {
+                    priorityQueue.Enqueue("log: Kevin Smith", 1);
+                    
                     articleSurface = _application.Window.NewSurface();
                     var browser = articleSurface.NewBrowser();
 
@@ -192,9 +238,22 @@ namespace InvDefault
                 }
 
                 cellPanel.SingleTapEvent += OnCellPanelOnSingleTapEvent;
+
                 return cellPanel;
 
+                
+
             };
+        }
+
+        private static void Flow_RefreshEvent(FlowRefresh obj)
+        {
+            throw new NotImplementedException();
+        }
+
+        private static void MainSurface_LeaveEvent()
+        {
+            throw new NotImplementedException();
         }
 
         //private static void LongRunningTask()
@@ -519,6 +578,15 @@ namespace InvDefault
                 return false;
             }
         }
+
+        /// <summary>
+        /// Return count of actions in queue.
+        /// </summary>
+        /// <returns></returns>
+        public int Count()
+        {
+            return _actions.Count;
+        }
     }
 
     public delegate void CrossThreadExceptionEventHandler(object sender, CrossThreadExceptionEventArgs e);
@@ -537,6 +605,8 @@ namespace InvDefault
         }
     }
 
+
+   
 
     #endregion helpers
 }

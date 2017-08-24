@@ -67,6 +67,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Class1.cs" />
+    <Compile Include="Class2.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Resources\Resources1.InvResourcePackage.cs">
       <DependentUpon>Resources1.InvResourcePackage</DependentUpon>
