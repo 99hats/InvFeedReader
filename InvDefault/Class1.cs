@@ -1,5 +1,4 @@
 ﻿using Inv;
-//using Priority_Queue;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -18,8 +17,6 @@ namespace InvDefault
     {
         private static Application _application;
 
-        private static Dictionary<string, bool> _loadingManager = new Dictionary<string, bool>();
-
         public static void Install(Inv.Application application)
         {
             _application = application;
@@ -37,18 +34,14 @@ namespace InvDefault
 
            var priorityQueue = new InvDefault.SimplePriorityQueue<string,int>();
 
-
             // main listview
             var flow = mainSurface.NewFlow();
             mainSurface.Content = flow;
             _application.Window.Transition(mainSurface).Fade();
 
-
-            // caching
-            var cache = new Dictionary<int, Panel>();
+            // dumb caching
+            var panelCache = new Dictionary<int, Panel>();
             var htmlCache = new Dictionary<string, string>();
-            htmlCache.Clear();
-            
 
             var headerLabel = mainSurface.NewLabel();
             headerLabel.Text = "Tech Crunch";
@@ -61,13 +54,11 @@ namespace InvDefault
             headerLabel.Font.Heavy();
             headerLabel.AdjustEvent += () =>
             {
-
-                // Because iOS doesn't get the Window.Height
-                // back to the program fast enough, use AdjustEvent
+                // iOS doesn't get the Window.Height
+                // back to the program fast enough
                 if (mainSurface.Window.Height > 0)
                 {
                     headerLabel.Padding.Set(0, (mainSurface.Window.Height / 3), 0, 4);
-                    flow.Refresh();
                 }
             };
 
@@ -75,32 +66,32 @@ namespace InvDefault
             var section = flow.AddSection();
             section.SetHeader(headerLabel);
 
-
             IList<Article> items = new List<Article>();
-            ActionQueue queue = new ActionQueue();
 
+
+            // pull-to-refresh made easy! except on windows
             flow.RefreshEvent += (FlowRefresh obj) =>
             {
                 Debug.WriteLine($"Refresh listview");
-                mainSurface.Window.RunTask((Thread) =>
+                mainSurface.Window.RunTask((rThread) =>
                 {
-                    var json =LoadArticles();
-                    Thread.Post(() => {
-                        items = json.articles.ToList();
+                    var feedObject =LoadArticles();
+                    rThread.Post(() => {
+                        items = feedObject.articles.ToList();
                         section.SetItemCount(items.Count);
+                        foreach (var article in items)
+                        {
+                            priorityQueue.Enqueue($"cache: {article.url}", 20);
+                        }
                         obj.Complete();
-                        cacheUrls(items);
                     });
                 });
             };
 
-
-
             FeedObject LoadArticles()
             {
                     var broker = application.Web.NewBroker("https://newsapi.org/v1/");
-                    var json = broker.GetTextJsonObject<FeedObject>(@"articles?source=techcrunch&sortBy=latest&apiKey=" + apiKey);
-                return json;
+                    return broker.GetTextJsonObject<FeedObject>(@"articles?source=techcrunch&sortBy=latest&apiKey=" + apiKey);
             }
 
             if (application.Device.IsWindows)
@@ -110,41 +101,25 @@ namespace InvDefault
                 var json = LoadArticles();
                 items = json.articles.ToList();
                 section.SetItemCount(items.Count);
-                cacheUrls(items);
             }
             else
             {
                 flow.Refresh();
             }
 
-            #region actionqueue
-            
 
-
-
-            void cacheUrl(string url)
+            string cacheUrl(string url)
             {
-                var key = @"https://mercury.postlight.com/amp?url=" + url;
-                var uri3 = new Uri(key);
-                Debug.WriteLine($"uri3: {key}");
+                var ampUri = @"https://mercury.postlight.com/amp?url=" + url;
+                var uri3 = new Uri(ampUri);
+                Debug.WriteLine($"uri3: {ampUri}");
                 var broker = _application.Web.NewBroker($"{uri3.Scheme}://{uri3.DnsSafeHost}");
-                var html = broker.GetPlainText(uri3.PathAndQuery);
-
-                htmlCache[url] = "cache " + html;
+                return "[cached]" + broker.GetPlainText(uri3.PathAndQuery);
             }
 
-            void cacheUrls(IList<Article> articles)
-            {
-                var browser = mainSurface.NewBrowser();
-                
-                foreach (var item in articles)
-                {
-                    queue.Enqueue(() => cacheUrl(item.url));
-                }
-            }
 
             // Background task queue
-            mainSurface.Window.RunTask((Thread) =>
+            mainSurface.Window.RunTask((WindowThread Thread) =>
             {
                 while (true)
                 {
@@ -153,12 +128,15 @@ namespace InvDefault
                         string response = priorityQueue.Dequeue();
                         Debug.WriteLine($"{priorityQueue.Count}: {response}");
 
-                        var split = response.Split(new char[] { ':' }, StringSplitOptions.None);
+                        var split = response.Split(new char[] { ':' }, 2);
                         var cmd = split[0].Trim();
                         var cmdParam = split[1].Trim();
                         switch (cmd)
                         {
                             case "cache":
+                                Debug.WriteLine($"Cache: {cmdParam}");
+                                var html = cacheUrl(cmdParam);
+                                Thread.Post(()=> htmlCache.Add(cmdParam, html));
                                 break;
 
                             case "log":
@@ -174,7 +152,6 @@ namespace InvDefault
                     }
                 }
             });
-            #endregion
 
             mainSurface.LeaveEvent += () =>
             {
@@ -185,17 +162,15 @@ namespace InvDefault
             section.ItemQuery += i =>
             {
                 // simple caching
-                if (cache.ContainsKey(i)) return cache[i];
+                if (panelCache.ContainsKey(i)) return panelCache[i];
 
                 var article = items[i];
 
                 var cellPanel = new FeedItemPanel(_application, mainSurface, article);
-                cache[i] = cellPanel;
+                panelCache[i] = cellPanel;
 
                 void OnCellPanelOnSingleTapEvent()
                 {
-                    priorityQueue.Enqueue("log: Kevin Smith", 1);
-                    
                     articleSurface = _application.Window.NewSurface();
                     var browser = articleSurface.NewBrowser();
 
@@ -216,19 +191,19 @@ namespace InvDefault
                     }
 
                     // preload next webpage
-                    if (i < section.ItemCount - 1)
-                    {
-                        mainSurface.Window.RunTask(Thread =>
-                        {
-                            var nextItem = items[i + 1];
-                            var key = @"https://mercury.postlight.com/amp?url=" + nextItem.url;
-                            var uri3 = new Uri(key);
-                            var broker = _application.Web.NewBroker($"{uri3.Scheme}://{uri3.DnsSafeHost}");
-                            var html = broker.GetPlainText(uri3.PathAndQuery);
+                    //if (i < section.ItemCount - 1)
+                    //{
+                    //    mainSurface.Window.RunTask(Thread =>
+                    //    {
+                    //        var nextItem = items[i + 1];
+                    //        var key = @"https://mercury.postlight.com/amp?url=" + nextItem.url;
+                    //        var uri3 = new Uri(key);
+                    //        var broker = _application.Web.NewBroker($"{uri3.Scheme}://{uri3.DnsSafeHost}");
+                    //        var html = broker.GetPlainText(uri3.PathAndQuery);
 
-                            Thread.Post(() => { htmlCache[nextItem.url] = html; });
-                        });
-                    }
+                    //        Thread.Post(() => { htmlCache[nextItem.url] = html; });
+                    //    });
+                    //}
 
                     _application.Window.Transition(articleSurface).CarouselNext();
                     articleSurface.GestureBackwardEvent += () =>
@@ -245,22 +220,6 @@ namespace InvDefault
 
             };
         }
-
-        private static void Flow_RefreshEvent(FlowRefresh obj)
-        {
-            throw new NotImplementedException();
-        }
-
-        private static void MainSurface_LeaveEvent()
-        {
-            throw new NotImplementedException();
-        }
-
-        //private static void LongRunningTask()
-        //{
-        //    Task.Delay(5000);
-        //    Debug.WriteLine("LongRunningTask ran");
-        //}
 
         /// <summary>
         /// Returns a MD5 hash as a string
@@ -408,205 +367,6 @@ namespace InvDefault
         public Size Size => Base.Size;
         public Alignment Alignment => Base.Alignment;
     }
-
-    public class BackgroundQueue
-    {
-        private Task previousTask = Task.FromResult(true);
-        private object key = new object();
-        public Task QueueTask(Action action)
-        {
-            lock (key)
-            {
-                previousTask = previousTask.ContinueWith(t => action()
-                    , CancellationToken.None
-                    , TaskContinuationOptions.None
-                    , TaskScheduler.Default);
-                return previousTask;
-            }
-        }
-
-        public Task<T> QueueTask<T>(Func<T> work)
-        {
-            lock (key)
-            {
-                var task = previousTask.ContinueWith(t => work()
-                    , CancellationToken.None
-                    , TaskContinuationOptions.None
-                    , TaskScheduler.Default);
-                previousTask = task;
-                return task;
-            }
-        }
-    }
-
-
-
-    // https://codereview.stackexchange.com/questions/6826/action-queue-in-net-3-5
-    public class ActionQueue
-    {
-        private Thread _thread;
-        private bool _isProcessed = false;
-        private object _queueSync = new object();
-        private readonly Queue<Action> _actions = new Queue<Action>();
-        private SynchronizationContext _context;
-
-        /// <summary>
-        /// Occurs when one of executed action throws unhandled exception.
-        /// </summary>
-        public event CrossThreadExceptionEventHandler ExceptionOccured;
-
-        /// <summary>
-        /// Occurs when all actions in queue are finished.
-        /// </summary>
-        public event EventHandler ProcessingFinished;
-
-        /// <summary>
-        /// Gets enqueued actions.
-        /// </summary>
-        public IEnumerable<Action> Actions
-        {
-            get
-            {
-                lock (_queueSync)
-                {
-                    return new ReadOnlyCollection<Action>(_actions.ToList());
-                }
-            }
-        }
-
-        protected virtual void Execute()
-        {
-            _isProcessed = true;
-
-            try
-            {
-                while (true)
-                {
-                    Action action = null;
-
-                    lock (_queueSync)
-                    {
-                        if (_actions.Count == 0)
-                            break;
-                        else
-                            action = _actions.Dequeue();
-                    }
-
-                    action.Invoke();
-                }
-
-                if (ProcessingFinished != null)
-                {
-                    _context.Send(s => ProcessingFinished(this, EventArgs.Empty), null);
-                }
-            }
-            catch (ThreadAbortException)
-            {
-                // Execution aborted
-            }
-            catch (Exception ex)
-            {
-                if (ExceptionOccured != null)
-                {
-                    _context.Send(s => ExceptionOccured(this, new CrossThreadExceptionEventArgs(ex)), null);
-                }
-            }
-            finally
-            {
-                _isProcessed = false;
-            }
-        }
-
-        /// <summary>
-        /// Starts processing current queue.
-        /// </summary>
-        /// <returns>Returns true if execution was started.</returns>
-        public virtual bool Process()
-        {
-            if (!_isProcessed)
-            {
-                _context = SynchronizationContext.Current;
-
-                _thread = new Thread(Execute);
-                _thread.Start();
-
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Enqueues action to process.
-        /// </summary>
-        /// <param name="action">Action to enqueue.</param>
-        public void Enqueue(Action action)
-        {
-            lock (_queueSync)
-            {
-                Debug.WriteLine("Enqueue");
-                _actions.Enqueue(action);
-            }
-        }
-
-        /// <summary>
-        /// Clears queue.
-        /// </summary>
-        public void Clear()
-        {
-            lock (_queueSync)
-            {
-                _actions.Clear();
-            }
-        }
-
-        /// <summary>
-        /// Aborts execution of current queue.
-        /// </summary>
-        /// <returns>Returns true if execution was aborted.</returns>
-        public bool Abort()
-        {
-            if (_isProcessed)
-            {
-                _thread.Abort();
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Return count of actions in queue.
-        /// </summary>
-        /// <returns></returns>
-        public int Count()
-        {
-            return _actions.Count;
-        }
-    }
-
-    public delegate void CrossThreadExceptionEventHandler(object sender, CrossThreadExceptionEventArgs e);
-
-    public class CrossThreadExceptionEventArgs : EventArgs
-    {
-        public CrossThreadExceptionEventArgs(Exception exception)
-        {
-            this.Exception = exception;
-        }
-
-        public Exception Exception
-        {
-            get;
-            set;
-        }
-    }
-
-
-   
 
     #endregion helpers
 }
