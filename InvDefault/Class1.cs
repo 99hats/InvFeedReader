@@ -20,11 +20,11 @@ namespace InvDefault
         public static void Install(Inv.Application application)
         {
             _application = application;
-            _application.Title = "News Feed";
+            _application.Title = "FeedRead";
 
             // main surface
-            var mainSurface = application.Window.NewSurface();
-            mainSurface.Background.Colour = Colour.LightGray;
+            var feedSurface = application.Window.NewSurface();
+            feedSurface.Background.Colour = Colour.LightGray;
 
             // sub surface
             Surface articleSurface;
@@ -35,32 +35,23 @@ namespace InvDefault
            var priorityQueue = new InvDefault.SimplePriorityQueue<string,int>();
 
             // main listview
-            var flow = mainSurface.NewFlow();
-            _application.Window.Transition(mainSurface).Fade();
-            mainSurface.Content = flow;
+            var flow = feedSurface.NewFlow();
+            _application.Window.Transition(feedSurface).Fade();
+            feedSurface.Content = flow;
 
             // dumb caching
             var panelCache = new Dictionary<int, Panel>();
             var htmlCache = new Dictionary<string, string>();
 
-            var headerLabel = mainSurface.NewLabel();
-            headerLabel.Text = "Tech Crunch";
+            var headerLabel = feedSurface.NewLabel();
+            headerLabel.Text = "FeedRead";
             headerLabel.JustifyCenter();
             headerLabel.Alignment.TopStretch();
-            //headerLabel.Padding.Set(0, (_application.Window.Height / 3), 0, 4);
+            headerLabel.Padding.Set(0, 12, 0, 4);
             headerLabel.Background.Colour = Colour.DodgerBlue;
             headerLabel.Font.Colour = Colour.White;
             headerLabel.Font.Size = 32;
             headerLabel.Font.Heavy();
-            headerLabel.AdjustEvent += () =>
-            {
-                // iOS doesn't get the Window.Height
-                // back to the program fast enough
-                if (mainSurface.Window.Height > 0)
-                {
-                    headerLabel.Padding.Set(0, (mainSurface.Window.Height / 3), 0, 4);
-                }
-            };
 
             // section
             var section = flow.AddSection();
@@ -72,7 +63,7 @@ namespace InvDefault
             flow.RefreshEvent += (FlowRefresh obj) =>
             {
                 Debug.WriteLine($"Refresh listview");
-                mainSurface.Window.RunTask((rThread) =>
+                feedSurface.Window.RunTask((rThread) =>
                 {
                     var feedObject =LoadArticles();
                     rThread.Post(() => {
@@ -92,7 +83,7 @@ namespace InvDefault
             FeedObject LoadArticles()
             {
                     var broker = application.Web.NewBroker("https://newsapi.org/v1/");
-                    return broker.GetTextJsonObject<FeedObject>(@"articles?source=techcrunch&sortBy=latest&apiKey=" + apiKey);
+                    return broker.GetTextJsonObject<FeedObject>(@"articles?source=ars-technica&sortBy=top&apiKey=" + apiKey);
             }
 
             if (application.Device.IsWindows)
@@ -120,7 +111,7 @@ namespace InvDefault
 
             void cacheImageToDisk(string url)
             {
-                var cacheFileName = Shell.GetMD5Hash(url) + ".jpg";
+                var cacheFileName = Helpers.GetMD5Hash(url) + ".jpg";
                 var cacheFile = _application.Directory.RootFolder.NewFile(cacheFileName);
                 if (cacheFile.Exists()) return; 
                     using (var download = _application.Web.GetDownload(new Uri(url)))
@@ -136,7 +127,7 @@ namespace InvDefault
 
 
             // Background task queue
-            mainSurface.Window.RunTask((WindowThread Thread) =>
+            feedSurface.Window.RunTask((WindowThread Thread) =>
             {
                 while (true)
                 {
@@ -175,7 +166,7 @@ namespace InvDefault
                 }
             });
 
-            mainSurface.LeaveEvent += () =>
+            feedSurface.LeaveEvent += () =>
             {
                 // it's not you, it's me
                 Debug.Write("mainSurface.LeaveEvent");
@@ -189,16 +180,18 @@ namespace InvDefault
 
                 var article = items[i];
 
-                var cellPanel = new FeedItemPanel(_application, mainSurface, article);
+                var cellPanel = new FeedItemPanel(_application, feedSurface, article);
+
+                // cache panel
                 panelCache[i] = cellPanel;
 
-                void OnCellPanelOnSingleTapEvent()
+                cellPanel.SingleTapEvent += () =>
                 {
                     articleSurface = _application.Window.NewSurface();
                     var browser = articleSurface.NewBrowser();
 
-                    var uriString = @"https://mercury.postlight.com/amp?url=" + article.url;
-
+                    // get AMP optimized pages for mobile
+                    var ampUri = @"https://mercury.postlight.com/amp?url=" + article.url;
 
                     // use cache
                     if (htmlCache.ContainsKey(article.url))
@@ -209,21 +202,23 @@ namespace InvDefault
                     }
                     else
                     {
-                        var uri2 = new Uri(uriString);
+                        var uri2 = new Uri(ampUri);
                         Debug.WriteLine(uri2.AbsoluteUri);
                         browser.LoadUri(uri2);
                         articleSurface.Content = browser;
+                        htmlCache.Add(article.url, browser.Html);
                     }
 
 
+                    // aah, simple transition
                     _application.Window.Transition(articleSurface).CarouselNext();
+
                     articleSurface.GestureBackwardEvent += () =>
                     {
-                        _application.Window.Transition(mainSurface).CarouselBack();
+                        // and simple return
+                        _application.Window.Transition(feedSurface).CarouselBack();
                     };
-                }
-
-                cellPanel.SingleTapEvent += OnCellPanelOnSingleTapEvent;
+                };
 
                 return cellPanel;
 
@@ -232,27 +227,6 @@ namespace InvDefault
             };
         }
 
-        /// <summary>
-        /// Returns a MD5 hash as a string
-        /// </summary>
-        /// <param name="TextToHash">String to be hashed.</param>
-        /// <returns>Hash as string.</returns>
-        public static String GetMD5Hash(String TextToHash)
-        {
-            //Check wether data was passed
-            if ((TextToHash == null) || (TextToHash.Length == 0))
-            {
-                return String.Empty;
-            }
-
-            //Calculate MD5 hash. This requires that the string is splitted into a byte[].
-            MD5 md5 = new MD5CryptoServiceProvider();
-            byte[] textToHash = Encoding.Default.GetBytes(TextToHash);
-            byte[] result = md5.ComputeHash(textToHash);
-
-            //Convert result back to string.
-            return System.BitConverter.ToString(result);
-        }
 
     }
 
@@ -277,7 +251,7 @@ namespace InvDefault
     }
     #endregion
 
-    #region helpers
+    #region panels
     public class FeedItemPanel : Inv.Mimic<Button>
     {
         private Application _application;
@@ -292,11 +266,6 @@ namespace InvDefault
 
             this.Base = surface.NewButton();
 
-            BuildPanel();
-        }
-
-        private void BuildPanel()
-        {
             var graphic = new WebGraphic(_application, _surface, _article.urlToImage);
             graphic.Size.SetWidth(_surface.Window.Width);
 
@@ -320,10 +289,11 @@ namespace InvDefault
             this.Base.Content = panel;
         }
 
+        // events are too fancy for a single expression bodies
         public event Action SingleTapEvent
         {
-            add { this.Base.SingleTapEvent += value; }
-            remove { this.Base.SingleTapEvent -= value; }
+            add => this.Base.SingleTapEvent += value;
+            remove => this.Base.SingleTapEvent -= value;
         }
     }
 
@@ -334,7 +304,7 @@ namespace InvDefault
             this.Base = surface.NewGraphic();
             this.Base.Image = Inv.Default.Resources.Images.Placeholder; // put loading image here
 
-            var cacheFileName = Shell.GetMD5Hash(uri) + ".jpg";
+            var cacheFileName = Helpers.GetMD5Hash(uri) + ".jpg";
             var files = _application.Directory.RootFolder.GetFiles("*.jpg");
 
             Debug.WriteLine($"cacheFileName: {cacheFileName}");

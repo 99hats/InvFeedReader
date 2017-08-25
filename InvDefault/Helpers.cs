@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,13 +10,39 @@ namespace InvDefault
 {
 
 
+    public static class Helpers
+    {
 
-/// <summary>
-/// The IPriorityQueue interface.  This is mainly here for purists, and in case I decide to add more implementations later.
-/// For speed purposes, it is actually recommended that you *don't* access the priority queue through this interface, since the JIT can
-/// (theoretically?) optimize method calls from concrete-types slightly better.
-/// </summary>
-public interface IPriorityQueue<TItem, in TPriority> : IEnumerable<TItem>
+        /// <summary>
+        /// Returns a MD5 hash as a string
+        /// </summary>
+        /// <param name="TextToHash">String to be hashed.</param>
+        /// <returns>Hash as string.</returns>
+        public static String GetMD5Hash(String TextToHash)
+        {
+            //Check wether data was passed
+            if ((TextToHash == null) || (TextToHash.Length == 0))
+            {
+                return String.Empty;
+            }
+
+            //Calculate MD5 hash. This requires that the string is splitted into a byte[].
+            MD5 md5 = new MD5CryptoServiceProvider();
+            byte[] textToHash = Encoding.Default.GetBytes(TextToHash);
+            byte[] result = md5.ComputeHash(textToHash);
+
+            //Convert result back to string.
+            return System.BitConverter.ToString(result);
+        }
+
+    }
+
+    /// <summary>
+    /// The IPriorityQueue interface.  This is mainly here for purists, and in case I decide to add more implementations later.
+    /// For speed purposes, it is actually recommended that you *don't* access the priority queue through this interface, since the JIT can
+    /// (theoretically?) optimize method calls from concrete-types slightly better.
+    /// </summary>
+    public interface IPriorityQueue<TItem, in TPriority> : IEnumerable<TItem>
     where TPriority : IComparable<TPriority>
 {
     /// <summary>
@@ -759,4 +786,7 @@ public class SimplePriorityQueue<TItem, TPriority> : IPriorityQueue<TItem, TPrio
         }
     }
 }
+
+
+
 }
