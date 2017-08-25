@@ -47,7 +47,7 @@ namespace InvDefault
             headerLabel.Text = "Tech Crunch";
             headerLabel.JustifyCenter();
             headerLabel.Alignment.TopStretch();
-            headerLabel.Padding.Set(0, (_application.Window.Height / 3), 0, 4);
+            //headerLabel.Padding.Set(0, (_application.Window.Height / 3), 0, 4);
             headerLabel.Background.Colour = Colour.DodgerBlue;
             headerLabel.Font.Colour = Colour.White;
             headerLabel.Font.Size = 32;
@@ -82,6 +82,7 @@ namespace InvDefault
                         foreach (var article in items)
                         {
                             priorityQueue.Enqueue($"cache: {article.url}", 20);
+                            priorityQueue.Enqueue($"imageCache: {article.urlToImage}", 10);
                         }
                         obj.Complete();
                     });
@@ -108,13 +109,29 @@ namespace InvDefault
             }
 
 
-            string cacheUrl(string url)
+            string fetchWebPage(string url)
             {
                 var ampUri = @"https://mercury.postlight.com/amp?url=" + url;
                 var uri3 = new Uri(ampUri);
-                Debug.WriteLine($"uri3: {ampUri}");
+                //Debug.WriteLine($"uri3: {ampUri}");
                 var broker = _application.Web.NewBroker($"{uri3.Scheme}://{uri3.DnsSafeHost}");
                 return "[cached]" + broker.GetPlainText(uri3.PathAndQuery);
+            }
+
+            void cacheImageToDisk(string url)
+            {
+                var cacheFileName = Shell.GetMD5Hash(url) + ".jpg";
+                var cacheFile = _application.Directory.RootFolder.NewFile(cacheFileName);
+                if (cacheFile.Exists()) return; 
+                    using (var download = _application.Web.GetDownload(new Uri(url)))
+
+                    using (var memoryStream = new MemoryStream((int) download.Length))
+                    {
+                        
+                        download.Stream.CopyTo(memoryStream);
+                        memoryStream.Flush();
+                        cacheFile.WriteAllBytes(memoryStream.ToArray());
+                    }
             }
 
 
@@ -134,9 +151,15 @@ namespace InvDefault
                         switch (cmd)
                         {
                             case "cache":
-                                Debug.WriteLine($"Cache: {cmdParam}");
-                                var html = cacheUrl(cmdParam);
+                                //Debug.WriteLine($"Cache: {cmdParam}");
+                                if (htmlCache.ContainsKey(cmdParam)) break;
+                                var html = fetchWebPage(cmdParam);
                                 Thread.Post(()=> htmlCache.Add(cmdParam, html));
+                                break;
+
+                            case "imageCache":
+                                //Debug.WriteLine($"imageCache: {cmdParam}");
+                                cacheImageToDisk(cmdParam);
                                 break;
 
                             case "log":
