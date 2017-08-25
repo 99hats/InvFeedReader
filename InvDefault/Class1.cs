@@ -36,8 +36,8 @@ namespace InvDefault
 
             // main listview
             var flow = mainSurface.NewFlow();
-            mainSurface.Content = flow;
             _application.Window.Transition(mainSurface).Fade();
+            mainSurface.Content = flow;
 
             // dumb caching
             var panelCache = new Dictionary<int, Panel>();
@@ -68,7 +68,6 @@ namespace InvDefault
 
             IList<Article> items = new List<Article>();
 
-
             // pull-to-refresh made easy! except on windows
             flow.RefreshEvent += (FlowRefresh obj) =>
             {
@@ -77,6 +76,7 @@ namespace InvDefault
                 {
                     var feedObject =LoadArticles();
                     rThread.Post(() => {
+                        headerLabel.Text = feedObject.source;
                         items = feedObject.articles.ToList();
                         section.SetItemCount(items.Count);
                         foreach (var article in items)
@@ -143,7 +143,6 @@ namespace InvDefault
                                 Debug.WriteLine($"Log: {cmdParam}");
                                 break;
                         }
-
                     }
                     else
                     {
@@ -155,6 +154,7 @@ namespace InvDefault
 
             mainSurface.LeaveEvent += () =>
             {
+                // it's not you, it's me
                 Debug.Write("mainSurface.LeaveEvent");
             };
 
@@ -176,6 +176,8 @@ namespace InvDefault
 
                     var uriString = @"https://mercury.postlight.com/amp?url=" + article.url;
 
+
+                    // use cache
                     if (htmlCache.ContainsKey(article.url))
                     {
                         var html = htmlCache[article.url];
@@ -190,20 +192,6 @@ namespace InvDefault
                         articleSurface.Content = browser;
                     }
 
-                    // preload next webpage
-                    //if (i < section.ItemCount - 1)
-                    //{
-                    //    mainSurface.Window.RunTask(Thread =>
-                    //    {
-                    //        var nextItem = items[i + 1];
-                    //        var key = @"https://mercury.postlight.com/amp?url=" + nextItem.url;
-                    //        var uri3 = new Uri(key);
-                    //        var broker = _application.Web.NewBroker($"{uri3.Scheme}://{uri3.DnsSafeHost}");
-                    //        var html = broker.GetPlainText(uri3.PathAndQuery);
-
-                    //        Thread.Post(() => { htmlCache[nextItem.url] = html; });
-                    //    });
-                    //}
 
                     _application.Window.Transition(articleSurface).CarouselNext();
                     articleSurface.GestureBackwardEvent += () =>
