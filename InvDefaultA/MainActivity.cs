@@ -5,7 +5,7 @@ using Application = Inv.Application;
 
 namespace InvDefaultA
 {
-    [Activity(Label = "InvDefaultA", MainLauncher = true, Icon = "@drawable/icon")]
+    [Activity(Label = "FeedRead", MainLauncher = true, Icon = "@drawable/icon")]
     public class MainActivity : Inv.AndroidActivity
     {
         public override void Install(Application application)

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Inv;
 
 namespace InvDefaultW
 {
@@ -11,11 +12,12 @@ namespace InvDefaultW
         [STAThread]
         static void Main(string[] args)
         {
+
             Inv.WpfShell.CheckRequirements(() =>
             {
 #if DEBUG
                 Inv.WpfShell.PreventDeviceEmulation = false;
-                Inv.WpfShell.DeviceEmulation = Inv.WpfDeviceEmulation.iPad_Mini;
+                Inv.WpfShell.DeviceEmulation = Inv.WpfDeviceEmulation.iPhone6_7;
 #endif
                 Inv.WpfShell.FullScreenMode = false;
                 Inv.WpfShell.DefaultWindowWidth = 1920;
@@ -24,4 +26,6 @@ namespace InvDefaultW
             });
         }
     }
+
+    
 }
