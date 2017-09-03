@@ -10,11 +10,12 @@
     <RootNamespace>
     </RootNamespace>
     <AssemblyName>InvDefault</AssemblyName>
-    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
-    <TargetFrameworkProfile />
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -40,11 +41,11 @@
     <Reference Include="FFImageLoading.Platform, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Xamarin.FFImageLoading.2.2.10-pre-438\lib\portable-net45+win8+wpa81+wp8\FFImageLoading.Platform.dll</HintPath>
     </Reference>
-    <Reference Include="Inv.Library, Version=1.0.25.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
-      <HintPath>..\packages\Invention.Library.1.0.25\lib\portable45-net45+win8\Inv.Library.dll</HintPath>
+    <Reference Include="Inv.Library, Version=1.0.26.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
+      <HintPath>..\packages\Invention.Library.1.0.26\lib\portable45-net45+win8\Inv.Library.dll</HintPath>
     </Reference>
-    <Reference Include="Inv.Platform, Version=1.0.25.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
-      <HintPath>..\packages\Invention.Platform.1.0.25\lib\portable45-net45+win8\Inv.Platform.dll</HintPath>
+    <Reference Include="Inv.Platform, Version=1.0.26.0, Culture=neutral, PublicKeyToken=014a23717efc9544, processorArchitecture=MSIL">
+      <HintPath>..\packages\Invention.Platform.1.0.26\lib\portable45-net45+win8\Inv.Platform.dll</HintPath>
     </Reference>
     <Reference Include="Newtonsoft.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
       <HintPath>..\packages\Newtonsoft.Json.10.0.2\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -74,6 +75,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="app.config" />
     <None Include="packages.config" />
     <None Include="Resources\Resources1.InvResourcePackage" />
     <EmbeddedResource Include="Resources\Resources1.InvResourcePackage.rs">
@@ -87,11 +89,11 @@
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\packages\Invention.Library.1.0.25\build\Invention.Library.targets" Condition="Exists('..\packages\Invention.Library.1.0.25\build\Invention.Library.targets')" />
+  <Import Project="..\packages\Invention.Library.1.0.26\build\Invention.Library.targets" Condition="Exists('..\packages\Invention.Library.1.0.26\build\Invention.Library.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\packages\Invention.Library.1.0.25\build\Invention.Library.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Invention.Library.1.0.25\build\Invention.Library.targets'))" />
+    <Error Condition="!Exists('..\packages\Invention.Library.1.0.26\build\Invention.Library.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Invention.Library.1.0.26\build\Invention.Library.targets'))" />
   </Target>
 </Project>

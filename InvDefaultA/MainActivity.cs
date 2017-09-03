@@ -8,7 +8,7 @@ namespace InvDefaultA
     [Activity(Label = "FeedRead", MainLauncher = true, Icon = "@drawable/icon")]
     public class MainActivity : Inv.AndroidActivity
     {
-        public override void Install(Application application)
+        protected override void Install(Application application)
         {
             InvDefault.Shell.Install(application);
         }
