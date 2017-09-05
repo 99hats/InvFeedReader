@@ -268,6 +268,7 @@ namespace InvDefault
 
             var graphic = new WebGraphic(_application, _surface, _article.urlToImage);
             graphic.Size.SetWidth(_surface.Window.Width);
+            graphic.Alignment.TopStretch();
 
             var lbl = _surface.NewLabel();
             lbl.LineWrapping = true;
